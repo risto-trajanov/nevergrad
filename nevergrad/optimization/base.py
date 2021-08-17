@@ -652,7 +652,7 @@ class Optimizer:  # pylint: disable=too-many-instance-attributes
                 (tmp_finished if x_job[1].done() else tmp_runnings).append(x_job)
             self._running_jobs, self._finished_jobs = tmp_runnings, tmp_finished
             first_iteration = False
-        return self.provide_recommendation() if self.num_objectives == 1 else None
+        return self.provide_recommendation() if self.num_objectives == 1 else p.Constant(None)
 
     def _info(self) -> tp.Dict[str, tp.Any]:
         """Easy access to debug/benchmark info"""
