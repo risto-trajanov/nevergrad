@@ -125,6 +125,7 @@ class RecastOptimizer(base.Optimizer):
         super().__init__(parametrization, budget, num_workers=num_workers)
         self._messaging_thread: tp.Optional[MessagingThread] = None  # instantiate at runtime
         self._last_optimizer_duration = 0.0001
+        self.replay_archive_tell = []
 
     def get_optimization_function(self) -> tp.Callable[[tp.Callable[..., tp.Any]], tp.Optional[tp.ArrayLike]]:
         """Return an optimization procedure function (taking a function to optimize as input)
@@ -165,6 +166,27 @@ class RecastOptimizer(base.Optimizer):
                     f"Recast optimizer raised an error:\n{self._messaging_thread.error}"
                 ) from self._messaging_thread.error
 
+    def __getstate__(self):
+        # Copy the object's state from self.__dict__ which contains
+        # all our instance attributes. Always use the dict.copy()
+        # method to avoid modifying the original state.
+        self._messaging_thread = None
+        print(self.seed)
+        state = self.__dict__.copy()
+        # Remove the unpicklable entries.
+        # del state['_messaging_thread']
+        return state
+
+    def __setstate__(self, state):
+        # Restore instance attributes (i.e., filename and lineno).
+        self.__dict__.update(state)
+        print(self.seed)
+        # Restore the previously opened optimizer's state.
+        for i in range(self.num_tell):
+            self._internal_ask_candidate()
+            candidate = self.replay_archive_tell[i]
+            self._internal_tell_candidate(candidate, candidate.loss)
+
     def _internal_tell_candidate(self, candidate: p.Parameter, loss: float) -> None:
         """Returns value for a point which was "asked"
         (none asked point cannot be "tell")
@@ -173,6 +195,7 @@ class RecastOptimizer(base.Optimizer):
         if not self._messaging_thread.is_alive():  # optimizer is done
             self._check_error()
             return
+        self.replay_archive_tell.append(candidate)
         self._messaging_thread.messages_tell.put(self._post_loss(candidate, loss))
 
     def _post_loss(self, candidate: p.Parameter, loss: float) -> tp.Loss:

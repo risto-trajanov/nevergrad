@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 
+import pickle
 import re
 import sys
 import time
@@ -16,6 +17,7 @@ from pathlib import Path
 from functools import partial
 from unittest import SkipTest
 from unittest.mock import patch
+from itertools import zip_longest
 import pytest
 import numpy as np
 import pandas as pd
@@ -833,3 +835,31 @@ def test_pymoo_pf() -> None:
             _simple_multiobjective(x.value)[0] < values[0] and _simple_multiobjective(x.value)[1] < values[1]
             for x in pf
         )
+
+
+def test_adapter() -> None:
+    optimizer = ng.optimizers.PymooNSGA2(parametrization=2, budget=300)
+    optimizer.parametrization.random_state.seed(12)
+    for _ in range(10):
+        x = optimizer.ask()
+        loss = _simple_multiobjective(*x.args, **x.kwargs)
+        optimizer.tell(x, loss)
+    pickle_out = open("opt.pickle", "wb")
+    pickle.dump(optimizer, pickle_out)
+    pickle_out.close()
+    pickle_in = open("opt.pickle", "rb")
+    optim = pickle.load(pickle_in)
+    for _ in range(50):
+        x = optim.ask()
+        loss = _simple_multiobjective(*x.args, **x.kwargs)
+        optim.tell(x, loss)
+    optimizer_2 = ng.optimizers.PymooNSGA2(parametrization=2, budget=300)
+    optimizer_2.parametrization.random_state.seed(12)
+    for _ in range(60):
+        x = optimizer_2.ask()
+        loss = _simple_multiobjective(*x.args, **x.kwargs)
+        optimizer_2.tell(x, loss)
+    pf1 = optim.pareto_front()
+    pf2 = optimizer_2.pareto_front()
+    for a_value, b_value in zip_longest([i.value for i in pf1], [i.value for i in pf2]):
+        assert np.allclose(a_value, b_value)
