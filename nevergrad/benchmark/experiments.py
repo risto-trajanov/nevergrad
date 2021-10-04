@@ -608,6 +608,119 @@ def paramultimodal(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
     return multimodal(seed, para=True)
 
 
+# @registry.register
+# def yabbob_old(
+#     seed: tp.Optional[int] = None,
+#     parallel: bool = False,
+#     big: bool = False,
+#     small: bool = False,
+#     noise: bool = False,
+#     hd: bool = False,
+#     constraint_case: int = 0,
+#     split: bool = False,
+#     tiny: bool = False,
+#     tuning: bool = False,
+#     bounded: bool = False,
+# ) -> tp.Iterator[Experiment]:
+#     """Yet Another Black-Box Optimization Benchmark.
+#     Related to, but without special effort for exactly sticking to, the BBOB/COCO dataset.
+#     Dimension 2, 10 and 50.
+#     Budget 50, 200, 800, 3200, 12800.
+#     Both rotated or not rotated.
+#     """
+#     seedg = create_seed_generator(seed)
+
+#     # List of objective functions.
+#     names = [
+#         "hm",
+#         "rastrigin",
+#         "griewank",
+#         "rosenbrock",
+#         "ackley",
+#         "lunacek",
+#         "deceptivemultimodal",
+#         "bucherastrigin",
+#         "multipeak",
+#     ]
+#     names += ["sphere", "doublelinearslope", "stepdoublelinearslope"]
+#     names += ["cigar", "altcigar", "ellipsoid", "altellipsoid", "stepellipsoid", "discus", "bentcigar"]
+#     names += ["deceptiveillcond", "deceptivemultimodal", "deceptivepath"]
+#     # Deceptive path is related to the sharp ridge function; there is a long path to the optimum.
+#     # Deceptive illcond is related to the difference of powers function; the conditioning varies as we get closer to the optimum.
+#     # Deceptive multimodal is related to the Weierstrass function and to the Schaffers function.
+
+#     # Parametrizing the noise level.
+#     if noise:
+#         noise_level = 100000 if hd else 100
+#     else:
+#         noise_level = 0
+
+#     # Choosing the list of optimizers.
+#     optims: tp.List[str] = get_optimizers("competitive", seed=next(seedg))  # type: ignore
+#     if noise:
+#         optims += ["TBPSA", "SQP", "NoisyDiscreteOnePlusOne"]
+#     if hd:
+#         optims += ["OnePlusOne"]
+#         optims += get_optimizers("splitters", seed=next(seedg))  # type: ignore
+
+#     if hd and small:
+#         optims = ["BO", "CMA", "PSO", "DE"]
+
+#     if bounded:
+#         optims = ["BO", "PCABO", "BayesOptimBO", "CMA", "PSO", "DE"]
+
+#     # List of objective functions.
+#     functions = [
+#         ArtificialFunction(
+#             name, block_dimension=d, rotation=rotation, noise_level=noise_level, split=split, bounded=bounded
+#         )
+#         for name in names
+#         for rotation in [True, False]
+#         for num_blocks in ([1] if not split else [7, 12])
+#         for d in (
+#             [100, 1000, 3000] if hd else ([2, 5, 10, 15] if tuning else ([40] if bounded else [2, 10, 50]))
+#         )
+#     ]
+#     if tiny:
+#         functions = functions[::13]
+
+#     # We possibly add constraints.
+#     max_num_constraints = 4
+#     constraints: tp.List[tp.Any] = [
+#         _Constraint(name, as_bool)
+#         for as_bool in [False, True]
+#         for name in ["sum", "diff", "second_diff", "ball"]
+#     ]
+#     assert (
+#         constraint_case < len(constraints) + max_num_constraints
+#     ), "constraint_case should be in 0, 1, ..., {len(constraints) + max_num_constraints - 1} (0 = no constraint)."
+#     # We reduce the number of tests when there are constraints, as the number of cases
+#     # is already multiplied by the number of constraint_case.
+#     for func in functions[:: 13 if constraint_case > 0 else 1]:
+#         # We add a window of the list of constraints. This windows finishes at "constraints" (hence, is empty if
+#         # constraint_case=0).
+#         for constraint in constraints[max(0, constraint_case - max_num_constraints) : constraint_case]:
+#             func.parametrization.register_cheap_constraint(constraint)
+
+#     budgets = (
+#         [40000, 80000, 160000, 320000]
+#         if (big and not noise)
+#         else ([50, 200, 800, 3200, 12800] if not noise else [3200, 12800])
+#     )
+#     if small and not noise:
+#         budgets = [10, 20, 40]
+#     if bounded:
+#         budgets = [10, 20, 40, 100, 300]
+#     for optim in optims:
+#         for function in functions:
+#             for budget in budgets:
+#                 xp = Experiment(
+#                     function, optim, num_workers=100 if parallel else 1, budget=budget, seed=next(seedg)
+#                 )
+#                 if not xp.is_incoherent:
+#                     yield xp
+
+
 # pylint: disable=redefined-outer-name,too-many-arguments
 @registry.register
 def yabbob(
@@ -622,7 +735,9 @@ def yabbob(
     tiny: bool = False,
     tuning: bool = False,
     bounded: bool = False,
-) -> tp.Iterator[Experiment]:
+    name: str = None,
+    rotation:bool = False
+) -> tp.Tuple[tp.List[ArtificialFunction], tp.List[tp.Dict], tp.List[int]]:
     """Yet Another Black-Box Optimization Benchmark.
     Related to, but without special effort for exactly sticking to, the BBOB/COCO dataset.
     Dimension 2, 10 and 50.
@@ -632,20 +747,20 @@ def yabbob(
     seedg = create_seed_generator(seed)
 
     # List of objective functions.
-    names = [
-        "hm",
-        "rastrigin",
-        "griewank",
-        "rosenbrock",
-        "ackley",
-        "lunacek",
-        "deceptivemultimodal",
-        "bucherastrigin",
-        "multipeak",
-    ]
-    names += ["sphere", "doublelinearslope", "stepdoublelinearslope"]
-    names += ["cigar", "altcigar", "ellipsoid", "altellipsoid", "stepellipsoid", "discus", "bentcigar"]
-    names += ["deceptiveillcond", "deceptivemultimodal", "deceptivepath"]
+    # names = [
+    #     "hm",
+    #     "rastrigin",
+    #     "griewank",
+    #     "rosenbrock",
+    #     "ackley",
+    #     "lunacek",
+    #     "deceptivemultimodal",
+    #     "bucherastrigin",
+    #     "multipeak",
+    # ]
+    # names += ["sphere", "doublelinearslope", "stepdoublelinearslope"]
+    # names += ["cigar", "altcigar", "ellipsoid", "altellipsoid", "stepellipsoid", "discus", "bentcigar"]
+    # names += ["deceptiveillcond", "deceptivemultimodal", "deceptivepath"]
     # Deceptive path is related to the sharp ridge function; there is a long path to the optimum.
     # Deceptive illcond is related to the difference of powers function; the conditioning varies as we get closer to the optimum.
     # Deceptive multimodal is related to the Weierstrass function and to the Schaffers function.
@@ -656,52 +771,29 @@ def yabbob(
     else:
         noise_level = 0
 
-    # Choosing the list of optimizers.
-    optims: tp.List[str] = get_optimizers("competitive", seed=next(seedg))  # type: ignore
-    if noise:
-        optims += ["TBPSA", "SQP", "NoisyDiscreteOnePlusOne"]
-    if hd:
-        optims += ["OnePlusOne"]
-        optims += get_optimizers("splitters", seed=next(seedg))  # type: ignore
-
-    if hd and small:
-        optims = ["BO", "CMA", "PSO", "DE"]
-
-    if bounded:
-        optims = ["BO", "PCABO", "BayesOptimBO", "CMA", "PSO", "DE"]
-
-    # List of objective functions.
-    functions = [
-        ArtificialFunction(
-            name, block_dimension=d, rotation=rotation, noise_level=noise_level, split=split, bounded=bounded
-        )
-        for name in names
-        for rotation in [True, False]
-        for num_blocks in ([1] if not split else [7, 12])
-        for d in (
-            [100, 1000, 3000] if hd else ([2, 5, 10, 15] if tuning else ([40] if bounded else [2, 10, 50]))
-        )
-    ]
+   
+    functions = []
+    function_configurations = []
+    
+    for name in name:
+        for rotation in [True, False]:
+            for num_blocks in ([1] if not split else [7, 12]):
+                for d in ([100, 1000, 3000] if hd else ([2, 5, 10, 15] if tuning else ([40] if bounded else [2, 10, 50]))):
+                    functions.append(ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=noise_level, split=split, bounded=bounded))
+                    function_configurations.append(
+                        {
+                            'name':name,
+                            'block_dimensions':d,
+                            'rotation':rotation,
+                            'num_blocks':num_blocks,
+                            'noise_level':noise_level,
+                            'split':split,
+                            'bounded':bounded,
+                            'tiny':tiny
+                        }
+                    )
     if tiny:
         functions = functions[::13]
-
-    # We possibly add constraints.
-    max_num_constraints = 4
-    constraints: tp.List[tp.Any] = [
-        _Constraint(name, as_bool)
-        for as_bool in [False, True]
-        for name in ["sum", "diff", "second_diff", "ball"]
-    ]
-    assert (
-        constraint_case < len(constraints) + max_num_constraints
-    ), "constraint_case should be in 0, 1, ..., {len(constraints) + max_num_constraints - 1} (0 = no constraint)."
-    # We reduce the number of tests when there are constraints, as the number of cases
-    # is already multiplied by the number of constraint_case.
-    for func in functions[:: 13 if constraint_case > 0 else 1]:
-        # We add a window of the list of constraints. This windows finishes at "constraints" (hence, is empty if
-        # constraint_case=0).
-        for constraint in constraints[max(0, constraint_case - max_num_constraints) : constraint_case]:
-            func.parametrization.register_cheap_constraint(constraint)
 
     budgets = (
         [40000, 80000, 160000, 320000]
@@ -712,14 +804,9 @@ def yabbob(
         budgets = [10, 20, 40]
     if bounded:
         budgets = [10, 20, 40, 100, 300]
-    for optim in optims:
-        for function in functions:
-            for budget in budgets:
-                xp = Experiment(
-                    function, optim, num_workers=100 if parallel else 1, budget=budget, seed=next(seedg)
-                )
-                if not xp.is_incoherent:
-                    yield xp
+    
+    return functions, function_configurations, budgets
+    
 
 
 @registry.register
