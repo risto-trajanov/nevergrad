@@ -736,7 +736,8 @@ def yabbob(
     tuning: bool = False,
     bounded: bool = False,
     name: str = None,
-    rotation:bool = False
+    rotation:bool = False,
+    options:dict = None
 ) -> tp.Tuple[tp.List[ArtificialFunction], tp.List[tp.Dict], tp.List[int]]:
     """Yet Another Black-Box Optimization Benchmark.
     Related to, but without special effort for exactly sticking to, the BBOB/COCO dataset.
@@ -746,52 +747,38 @@ def yabbob(
     """
     seedg = create_seed_generator(seed)
 
-    # List of objective functions.
-    # names = [
-    #     "hm",
-    #     "rastrigin",
-    #     "griewank",
-    #     "rosenbrock",
-    #     "ackley",
-    #     "lunacek",
-    #     "deceptivemultimodal",
-    #     "bucherastrigin",
-    #     "multipeak",
-    # ]
-    # names += ["sphere", "doublelinearslope", "stepdoublelinearslope"]
-    # names += ["cigar", "altcigar", "ellipsoid", "altellipsoid", "stepellipsoid", "discus", "bentcigar"]
-    # names += ["deceptiveillcond", "deceptivemultimodal", "deceptivepath"]
-    # Deceptive path is related to the sharp ridge function; there is a long path to the optimum.
-    # Deceptive illcond is related to the difference of powers function; the conditioning varies as we get closer to the optimum.
-    # Deceptive multimodal is related to the Weierstrass function and to the Schaffers function.
-
     # Parametrizing the noise level.
     if noise:
         noise_level = 100000 if hd else 100
     else:
         noise_level = 0
 
+    if options != None:
+        rotation = options.get('rotation')
+        num_blocks = 1
+        d = options.get('d')
+        name = options.get('name')
+        return ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=noise_level, split=split, bounded=bounded)
    
     functions = []
     function_configurations = []
-    
-    for name in name:
-        for rotation in [True, False]:
-            for num_blocks in ([1] if not split else [7, 12]):
-                for d in ([100, 1000, 3000] if hd else ([2, 5, 10, 15] if tuning else ([40] if bounded else [2, 10, 50]))):
-                    functions.append(ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=noise_level, split=split, bounded=bounded))
-                    function_configurations.append(
-                        {
-                            'name':name,
-                            'block_dimensions':d,
-                            'rotation':rotation,
-                            'num_blocks':num_blocks,
-                            'noise_level':noise_level,
-                            'split':split,
-                            'bounded':bounded,
-                            'tiny':tiny
-                        }
-                    )
+   
+    for rotation in [True, False]:
+        for num_blocks in ([1] if not split else [7, 12]):
+            for d in ([100, 1000, 3000] if hd else ([2, 5, 10, 15] if tuning else ([40] if bounded else [2, 10, 50]))):
+                functions.append(ArtificialFunction(name, block_dimension=d, rotation=rotation, noise_level=noise_level, split=split, bounded=bounded))
+                function_configurations.append(
+                    {
+                        'name':name,
+                        'block_dimensions':d,
+                        'rotation':rotation,
+                        'num_blocks':num_blocks,
+                        'noise_level':noise_level,
+                        'split':split,
+                        'bounded':bounded,
+                        'tiny':tiny
+                    }
+                )
     if tiny:
         functions = functions[::13]
 
@@ -842,9 +829,9 @@ def yahdnoisybbob(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
 
 
 @registry.register
-def yabigbbob(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
+def yabigbbob(seed: tp.Optional[int] = None, name:str=None, options:dict = None) -> tp.Tuple[tp.List[ArtificialFunction], tp.List[tp.Dict], tp.List[int]]:
     """Counterpart of yabbob with more budget."""
-    return yabbob(seed, parallel=False, big=True)
+    return yabbob(seed, parallel=False, big=True, name=name, options=options)
 
 
 @registry.register
@@ -872,15 +859,15 @@ def yatinybbob(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
 
 
 @registry.register
-def yasmallbbob(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
+def yasmallbbob(seed: tp.Optional[int] = None, name:str=None, options:dict=None) -> tp.Tuple[tp.List[ArtificialFunction], tp.List[tp.Dict], tp.List[int]]:
     """Counterpart of yabbob with less budget."""
-    return yabbob(seed, parallel=False, big=False, small=True)
+    return yabbob(seed, parallel=False, big=False, small=True, name=name, options=options)
 
 
 @registry.register
-def yahdbbob(seed: tp.Optional[int] = None) -> tp.Iterator[Experiment]:
+def yahdbbob(seed: tp.Optional[int] = None, name:str = None, options:dict = None) -> tp.Tuple[tp.List[ArtificialFunction], tp.List[tp.Dict], tp.List[int]]:
     """Counterpart of yabbob with higher dimensions."""
-    return yabbob(seed, hd=True)
+    return yabbob(seed, hd=True, name=name, options=options)
 
 
 @registry.register
