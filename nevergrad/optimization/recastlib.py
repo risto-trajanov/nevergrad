@@ -50,6 +50,7 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
             num_workers=self.num_workers,
             method=self.method,
             random_restart=self.random_restart,
+            options=self.options
         )
         subinstance.archive = self.archive
         subinstance.current_bests = self.current_bests
