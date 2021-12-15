@@ -25,7 +25,8 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
         *,
         method: str = "Nelder-Mead",
         random_restart: bool = False,
-        options: dict = {}
+        options: dict = {},
+        tol:float = 0
     ) -> None:
         super().__init__(parametrization, budget=budget, num_workers=num_workers)
         self.multirun = 1  # work in progress
@@ -35,6 +36,7 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
         self.method = method
         self.random_restart = random_restart
         self.options = options
+        self.tol = tol
 
     def _internal_tell_not_asked(self, candidate: p.Parameter, loss: tp.Loss) -> None:
         """Called whenever calling "tell" on a candidate that was not "asked".
@@ -50,7 +52,8 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
             num_workers=self.num_workers,
             method=self.method,
             random_restart=self.random_restart,
-            options=self.options
+            options=self.options,
+            tol=self.tol
         )
         subinstance.archive = self.archive
         subinstance.current_bests = self.current_bests
@@ -66,12 +69,13 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
         remaining: float = budget - self._num_ask
         while remaining > 0:  # try to restart if budget is not elapsed
             options: tp.Dict[str, tp.Any] = {} if self.budget is None else self.options
+            tol=self.tol
             res = scipyoptimize.minimize(
                 objective_function,
                 best_x if not self.random_restart else self._rng.normal(0.0, 1.0, self.dimension),
                 method=self.method,
                 options=options,
-                tol=0,
+                tol=tol
             )
             if res.fun < best_res:
                 best_res = res.fun
@@ -107,7 +111,7 @@ class ScipyOptimizer(base.ConfiguredOptimizer):
     no_parallelization = True
 
     # pylint: disable=unused-argument
-    def __init__(self, *, method: str = "Nelder-Mead", random_restart: bool = False, options:dict = {}) -> None:
+    def __init__(self, *, method: str = "Nelder-Mead", random_restart: bool = False, options:dict = {}, tol:float = 0) -> None:
         super().__init__(_ScipyMinimizeBase, locals())
 
 
