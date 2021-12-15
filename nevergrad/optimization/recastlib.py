@@ -25,6 +25,7 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
         *,
         method: str = "Nelder-Mead",
         random_restart: bool = False,
+        options: dict = {}
     ) -> None:
         super().__init__(parametrization, budget=budget, num_workers=num_workers)
         self.multirun = 1  # work in progress
@@ -33,6 +34,7 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
         assert method in ["Nelder-Mead", "COBYLA", "SLSQP", "Powell"], f"Unknown method '{method}'"
         self.method = method
         self.random_restart = random_restart
+        self.options = options
 
     def _internal_tell_not_asked(self, candidate: p.Parameter, loss: tp.Loss) -> None:
         """Called whenever calling "tell" on a candidate that was not "asked".
@@ -62,7 +64,7 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
             best_x = np.array(self.initial_guess, copy=True)  # copy, just to make sure it is not modified
         remaining: float = budget - self._num_ask
         while remaining > 0:  # try to restart if budget is not elapsed
-            options: tp.Dict[str, tp.Any] = {} if self.budget is None else {"maxiter": remaining}
+            options: tp.Dict[str, tp.Any] = {} if self.budget is None else self.options
             res = scipyoptimize.minimize(
                 objective_function,
                 best_x if not self.random_restart else self._rng.normal(0.0, 1.0, self.dimension),
@@ -104,7 +106,7 @@ class ScipyOptimizer(base.ConfiguredOptimizer):
     no_parallelization = True
 
     # pylint: disable=unused-argument
-    def __init__(self, *, method: str = "Nelder-Mead", random_restart: bool = False) -> None:
+    def __init__(self, *, method: str = "Nelder-Mead", random_restart: bool = False, options:dict = {}) -> None:
         super().__init__(_ScipyMinimizeBase, locals())
 
 
