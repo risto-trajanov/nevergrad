@@ -7,6 +7,7 @@
 import math
 import warnings
 import numpy as np
+from pandas._config.config import options
 from scipy import optimize as scipyoptimize
 import nevergrad.common.typing as tp
 from nevergrad.parametrization import parameter as p
@@ -68,7 +69,7 @@ class _ScipyMinimizeBase(recaster.SequentialRecastOptimizer):
             best_x = np.array(self.initial_guess, copy=True)  # copy, just to make sure it is not modified
         remaining: float = budget - self._num_ask
         while remaining > 0:  # try to restart if budget is not elapsed
-            options: tp.Dict[str, tp.Any] = {} if self.budget is None else self.options
+            options: tp.Dict[str, tp.Any] = self.options
             tol=self.tol
             res = scipyoptimize.minimize(
                 objective_function,
